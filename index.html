@@ -13,6 +13,7 @@
         font-family: monospace;
         background: #f7f7f7;
         transition: background 1s;
+        overflow: hidden;
     }
 
     #wrapper {
@@ -22,20 +23,24 @@
     }
 
     #ui {
-        font-size: 18px;
+        font-size: 2vw;
         margin-bottom: 8px;
-        color: #222; /* default score color */
+        color: #222;
         transition: color 0.5s;
+        text-align: center;
     }
 
     #container {
         position: relative;
-        width: 800px;
-        height: 200px;
+        width: 100%;
+        max-width: 800px;
+        height: 25vh;
     }
 
     canvas {
         display: block;
+        width: 100%;
+        height: 100%;
     }
 
     #gameOver {
@@ -44,12 +49,13 @@
         top: 40%;
         width: 100%;
         text-align: center;
-        font-size: 32px;
+        font-size: 4vw;
+        color: red;
     }
 
     button {
         margin-top: 10px;
-        font-size: 16px;
+        font-size: 2vw;
         padding: 6px 14px;
     }
 </style>
@@ -66,13 +72,27 @@
             GAME OVER<br>
             <button onclick="restart()">Restart</button>
         </div>
-        <canvas id="game" width="800" height="200"></canvas>
+        <canvas id="game"></canvas>
     </div>
 </div>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+
+let gameWidth = 800;
+let gameHeight = 200;
+
+function resizeCanvas() {
+    canvas.width = gameWidth;
+    canvas.height = gameHeight;
+}
+resizeCanvas();
+
+// Scaling factor for positions
+function scaleX(x) { return x / 800 * canvas.width; }
+function scaleY(y) { return y / 200 * canvas.height; }
+function scaleVal(v) { return v / 800 * canvas.width; } // scale width/height proportionally
 
 let groundY = 160;
 let gravity = 0.8;
@@ -143,7 +163,7 @@ function update() {
     if (frame % 600 === 0) {
         night = !night;
         document.body.style.background = night ? "#111" : "#f7f7f7";
-        uiEl.style.color = night ? "#fff" : "#222"; // score + label
+        uiEl.style.color = night ? "#fff" : "#222";
     }
 
     // Dino physics
@@ -189,8 +209,8 @@ function update() {
 // Draw
 function drawDino() {
     ctx.fillStyle = night ? "#fff" : "#222";
-    ctx.fillRect(dino.x, dino.y - dino.h, dino.w, dino.h);
-    ctx.fillRect(dino.x + dino.w - 6, dino.y - dino.h - 6, 6, 6);
+    ctx.fillRect(scaleX(dino.x), scaleY(dino.y - dino.h), scaleVal(dino.w), scaleVal(dino.h));
+    ctx.fillRect(scaleX(dino.x + dino.w - 6), scaleY(dino.y - dino.h - 6), scaleVal(6), scaleVal(6));
 }
 
 function draw() {
@@ -199,8 +219,8 @@ function draw() {
     // Ground
     ctx.strokeStyle = night ? "#888" : "#555";
     ctx.beginPath();
-    ctx.moveTo(0, groundY + 1);
-    ctx.lineTo(800, groundY + 1);
+    ctx.moveTo(0, scaleY(groundY + 1));
+    ctx.lineTo(canvas.width, scaleY(groundY + 1));
     ctx.stroke();
 
     drawDino();
@@ -208,7 +228,7 @@ function draw() {
     // Obstacles
     ctx.fillStyle = "#0a0";
     obstacles.forEach(o => {
-        ctx.fillRect(o.x, groundY - o.h, o.w, o.h);
+        ctx.fillRect(scaleX(o.x), scaleY(groundY - o.h), scaleVal(o.w), scaleVal(o.h));
     });
 }
 
@@ -234,13 +254,20 @@ function restart() {
     gameOver = false;
     night = false;
     scoreEl.textContent = 0;
-    uiEl.style.color = "#222"; // reset score + label
+    uiEl.style.color = "#222";
     document.getElementById("gameOver").style.display = "none";
     document.body.style.background = "#f7f7f7";
 }
 
 loop();
+
+// Optional: resize canvas dynamically on window resize
+window.addEventListener('resize', () => {
+    // Canvas stays same internal resolution, scales via CSS width/height
+    // Could recalc scaling here if you want
+});
 </script>
 
 </body>
 </html>
+
