@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dino Game</title>
+<style>
+    body {
+        margin: 0;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: monospace;
+        background: #f7f7f7;
+        transition: background 1s;
+    }
+
+    #wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    #ui {
+        font-size: 18px;
+        margin-bottom: 8px;
+        color: #222; /* default score color */
+        transition: color 0.5s;
+    }
+
+    #container {
+        position: relative;
+        width: 800px;
+        height: 200px;
+    }
+
+    canvas {
+        display: block;
+    }
+
+    #gameOver {
+        display: none;
+        position: absolute;
+        top: 40%;
+        width: 100%;
+        text-align: center;
+        font-size: 32px;
+    }
+
+    button {
+        margin-top: 10px;
+        font-size: 16px;
+        padding: 6px 14px;
+    }
+</style>
+</head>
+<body>
+
+<div id="wrapper">
+    <div id="ui">
+        Score: <span id="score">0</span> | High Score: <span id="highScore">0</span>
+    </div>
+
+    <div id="container">
+        <div id="gameOver">
+            GAME OVER<br>
+            <button onclick="restart()">Restart</button>
+        </div>
+        <canvas id="game" width="800" height="200"></canvas>
+    </div>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+let groundY = 160;
+let gravity = 0.8;
+let speed = 6;
+let score = 0;
+let frame = 0;
+let gameOver = false;
+let night = false;
+
+const uiEl = document.getElementById("ui");
+const scoreEl = document.getElementById("score");
+const highScoreEl = document.getElementById("highScore");
+
+// Load high score from localStorage
+let highScore = localStorage.getItem("dinoHighScore") || 0;
+highScoreEl.textContent = highScore;
+
+// Audio
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function beep(freq, dur) {
+    const osc = audioCtx.createOscillator();
+    osc.frequency.value = freq;
+    osc.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + dur);
+}
+
+// Dino
+const dino = {
+    x: 50,
+    y: groundY,
+    w: 24,
+    h: 36,
+    vy: 0,
+    jumping: false
+};
+
+// Obstacles
+let obstacles = [];
+function spawnObstacle() {
+    obstacles.push({
+        x: 800,
+        w: 20 + Math.random() * 10,
+        h: 30 + Math.random() * 20
+    });
+}
+
+// Controls
+function jump() {
+    if (!dino.jumping && !gameOver) {
+        dino.vy = -12;
+        dino.jumping = true;
+        beep(500, 0.08);
+    }
+}
+document.addEventListener("keydown", e => {
+    if (e.code === "Space" || e.code === "ArrowUp") jump();
+});
+document.addEventListener("touchstart", jump);
+
+// Update
+function update() {
+    if (gameOver) return;
+
+    frame++;
+
+    // Day / night
+    if (frame % 600 === 0) {
+        night = !night;
+        document.body.style.background = night ? "#111" : "#f7f7f7";
+        uiEl.style.color = night ? "#fff" : "#222"; // score + label
+    }
+
+    // Dino physics
+    dino.vy += gravity;
+    dino.y += dino.vy;
+    if (dino.y >= groundY) {
+        dino.y = groundY;
+        dino.vy = 0;
+        dino.jumping = false;
+    }
+
+    // Obstacles
+    if (frame % 90 === 0) spawnObstacle();
+    obstacles.forEach(o => o.x -= speed);
+    obstacles = obstacles.filter(o => o.x + o.w > 0);
+
+    // Collision
+    obstacles.forEach(o => {
+        if (
+            dino.x < o.x + o.w &&
+            dino.x + dino.w > o.x &&
+            dino.y > groundY - o.h
+        ) {
+            endGame();
+        }
+    });
+
+    // Difficulty & scoring
+    if (frame % 120 === 0) {
+        score++;
+        speed += 0.15;
+        scoreEl.textContent = score;
+
+        // Update high score
+        if (score > highScore) {
+            highScore = score;
+            highScoreEl.textContent = highScore;
+            localStorage.setItem("dinoHighScore", highScore);
+        }
+    }
+}
+
+// Draw
+function drawDino() {
+    ctx.fillStyle = night ? "#fff" : "#222";
+    ctx.fillRect(dino.x, dino.y - dino.h, dino.w, dino.h);
+    ctx.fillRect(dino.x + dino.w - 6, dino.y - dino.h - 6, 6, 6);
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Ground
+    ctx.strokeStyle = night ? "#888" : "#555";
+    ctx.beginPath();
+    ctx.moveTo(0, groundY + 1);
+    ctx.lineTo(800, groundY + 1);
+    ctx.stroke();
+
+    drawDino();
+
+    // Obstacles
+    ctx.fillStyle = "#0a0";
+    obstacles.forEach(o => {
+        ctx.fillRect(o.x, groundY - o.h, o.w, o.h);
+    });
+}
+
+// Loop
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+// End / restart
+function endGame() {
+    gameOver = true;
+    beep(120, 0.3);
+    document.getElementById("gameOver").style.display = "block";
+}
+
+function restart() {
+    obstacles = [];
+    speed = 6;
+    score = 0;
+    frame = 0;
+    gameOver = false;
+    night = false;
+    scoreEl.textContent = 0;
+    uiEl.style.color = "#222"; // reset score + label
+    document.getElementById("gameOver").style.display = "none";
+    document.body.style.background = "#f7f7f7";
+}
+
+loop();
+</script>
+
+</body>
+</html>
